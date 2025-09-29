@@ -52,10 +52,8 @@ private suspend fun Context.tryShizukuEnable(pkg: String, enabled: Boolean): Thr
 }
 
 private suspend fun Context.tryDhizukuEnable(pkg: String, enabled: Boolean): Throwable? {
-    if (!Dhizuku.init(this)) return Exception(resources.getString(R.string.dhizuku_not_running))
-
-    if (!Dhizuku.isPermissionGranted() && !DhizukuUtils.requestDhizukuPermission()) {
-        return Exception(resources.getString(R.string.no_dhizuku_access))
+    DhizukuUtils.checkDhizukuState(this)?.let {
+        return it
     }
 
     return tryWrappedBinderEnable(pkg, enabled) { Dhizuku.binderWrapper(it) }
@@ -126,18 +124,23 @@ suspend fun Context.setComponentEnabled(info: BaseComponentInfo, enabled: Boolea
         Shell.SU.available()
     }
 
-    val hasShizuku = { Shizuku.pingBinder() && hasShizukuPermission }
-    val hasDhizuku = { Dhizuku.init(this) && Dhizuku.isPermissionGranted() }
+    val hasShizuku = if (!hasRoot) {
+        Shizuku.pingBinder() && !hasShizukuPermission
+    } else {
+        false
+    }
 
-    if (!hasRoot && Shizuku.pingBinder() && !hasShizukuPermission) {
+    if (!hasRoot && hasShizuku) {
         requestShizukuPermission()
     }
 
-    if (!hasRoot && Dhizuku.init(this) && !Dhizuku.isPermissionGranted()) {
-        DhizukuUtils.requestDhizukuPermission()
+    val hasDhizuku = if (!hasRoot) {
+        DhizukuUtils.isDhizukuGranted(this)
+    } else {
+        false
     }
 
-    return if (hasRoot || hasShizuku() || hasDhizuku()) {
+    return if (hasRoot || hasShizuku || hasDhizuku) {
         suspend fun BinderWrapper.binderWrapper(): Throwable? {
             val binder = SystemServiceHelper.getSystemService("package")
             val ipm = IPackageManager.Stub.asInterface(wrapBinder(binder))
@@ -199,9 +202,9 @@ suspend fun Context.setComponentEnabled(info: BaseComponentInfo, enabled: Boolea
                 }
             } else {
                 val launchStrategy = when {
-                    hasShizuku() -> object :
+                    hasShizuku -> object :
                         tk.zwander.rootactivitylauncher.util.ShizukuBinderWrapper {}
-                    hasDhizuku() -> object : DhizukuBinderWrapper {}
+                    hasDhizuku -> object : DhizukuBinderWrapper {}
                     else -> {
                         return@withContext Exception(
                             resources.getString(R.string.unknown_state_change_error, info.info.safeComponentName.flattenToString())

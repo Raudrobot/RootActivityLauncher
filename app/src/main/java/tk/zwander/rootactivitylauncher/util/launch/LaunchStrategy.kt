@@ -10,7 +10,6 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.core.net.toUri
-import com.rosan.dhizuku.api.Dhizuku
 import eu.chainfire.libsuperuser.Shell
 import rikka.shizuku.Shizuku
 import rikka.shizuku.SystemServiceHelper
@@ -59,8 +58,7 @@ interface ShizukuLaunchStrategy : BinderWrapperLaunchStrategy,
 
 interface DhizukuLaunchStrategy : BinderWrapperLaunchStrategy, DhizukuBinderWrapper {
     override suspend fun Context.canRun(args: LaunchArgs): Boolean {
-        return Dhizuku.init(this) &&
-                (Dhizuku.isPermissionGranted() || DhizukuUtils.requestDhizukuPermission())
+        return DhizukuUtils.isDhizukuGranted(this)
     }
 }
 
