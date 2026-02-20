@@ -85,4 +85,5 @@ dependencies {
 
     implementation(libs.bugsnag.android)
     implementation(libs.dhizuku.api)
+    implementation(libs.material.icons.extended)
 }
